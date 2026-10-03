@@ -85,11 +85,13 @@ function clearLegacyAiPromptCaches(currentCacheKey) {
 
 export default function Home({
   session = null, // ✅ safe default
+  storageMode = "supabase",
   entries = [],
   entriesLoading,
   onAddEntry,
   onUpdateEntry,
   onDeleteEntry,
+  onUpdateLocalName,
 }) {
   const navigate = useNavigate();
 
@@ -124,6 +126,7 @@ export default function Home({
   const [aiSeenCounts, setAiSeenCounts] = useState({});
   const [aiPromptStatus, setAiPromptStatus] = useState("idle");
   const [aiLastError, setAiLastError] = useState("");
+  const [localNameDraft, setLocalNameDraft] = useState("");
   const aiRequestRef = useRef(0);
   const aiPendingRef = useRef(null);
   const timeTheme = getTimeThemeOverride() || getTimeTheme();
@@ -174,6 +177,19 @@ export default function Home({
 
     return "";
   }, [session]);
+  const needsLocalName = storageMode === "local" && (!firstName || firstName === "Local");
+
+  useEffect(() => {
+    if (!needsLocalName || localNameDraft) return;
+    setLocalNameDraft(firstName === "Local" ? "" : firstName);
+  }, [firstName, localNameDraft, needsLocalName]);
+
+  function saveLocalDisplayName(e) {
+    e.preventDefault();
+    const cleanName = capFirst(localNameDraft);
+    if (!cleanName || typeof onUpdateLocalName !== "function") return;
+    onUpdateLocalName(cleanName);
+  }
 
   // First-time helper only for the user's first entry
   const showFirstTimeHelper = useMemo(() => {
@@ -776,6 +792,30 @@ export default function Home({
           {firstName ? `, ${firstName}` : ""}
         </div>
       </div>
+
+      {needsLocalName && (
+        <form className="local-name-banner" onSubmit={saveLocalDisplayName}>
+          <div>
+            <div className="local-name-title">Personalize this demo</div>
+            <div className="small-muted">Add a name for the greeting on this device.</div>
+          </div>
+          <div className="local-name-controls">
+            <input
+              value={localNameDraft}
+              onChange={(e) => setLocalNameDraft(e.target.value)}
+              placeholder="Your name"
+              aria-label="Your name"
+            />
+            <button
+              type="submit"
+              className="btn btn-soft"
+              disabled={!localNameDraft.trim()}
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Composer */}
       {composerOpen ? (

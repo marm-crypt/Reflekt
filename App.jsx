@@ -27,6 +27,7 @@ import {
   getLocalSession,
   listLocalEntries,
   startLocalSession,
+  updateLocalSessionName,
   updateLocalEntry,
 } from "./lib/localJournalStore.js";
 
@@ -115,6 +116,12 @@ export default function App() {
     setSession(localSession);
     setEntries(listLocalEntries());
     navigate("/dashboard", { replace: true });
+  }
+
+  function handleUpdateLocalName(name) {
+    const localSession = updateLocalSessionName(name);
+    setStorageMode("local");
+    setSession(localSession);
   }
 
   /* ---------------------------
@@ -507,11 +514,13 @@ export default function App() {
               element={
                 <Home
                   session={session}
+                  storageMode={storageMode}
                   entries={entries}
                   entriesLoading={entriesLoading}
                   onAddEntry={addEntry}
                   onUpdateEntry={updateEntry}
                   onDeleteEntry={deleteEntry}
+                  onUpdateLocalName={handleUpdateLocalName}
                 />
               }
             />

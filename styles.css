@@ -1037,6 +1037,45 @@ button.new-entry-btn {
   color: #2f3566;
 }
 
+.local-name-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(116, 94, 246, 0.18);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-soft);
+}
+
+.local-name-title {
+  font-weight: 780;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.local-name-controls {
+  display: grid;
+  grid-template-columns: minmax(120px, 190px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.local-name-controls input {
+  min-height: 42px;
+}
+
+@media (max-width: 640px) {
+  .local-name-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .local-name-controls {
+    grid-template-columns: 1fr auto;
+  }
+}
+
 /* ---------- prompt band ---------- */
 .prompt-band {
   background: #6147f0;
