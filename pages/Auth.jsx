@@ -69,11 +69,11 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   const guestReady = useMemo(
     () =>
       guestName.trim().length > 0 &&
-      guestPasscode.trim().length >= 4 &&
+      /^\d{4}$/.test(guestPasscode.trim()) &&
       guestPasscode === guestPasscodeConfirm,
     [guestName, guestPasscode, guestPasscodeConfirm]
   );
-  const unlockReady = useMemo(() => unlockPasscode.trim().length > 0, [unlockPasscode]);
+  const unlockReady = useMemo(() => /^\d{4}$/.test(unlockPasscode.trim()), [unlockPasscode]);
 
   // Buttons / styles
   const activeBtn = "bg-[var(--color-primary)] text-white border-transparent";
@@ -129,6 +129,18 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     setGuestPasscodeConfirm("");
     setUnlockPasscode("");
     setMsg("");
+  }
+
+  function setDigits(setter, value) {
+    setter(value.replace(/\D/g, "").slice(0, 4));
+  }
+
+  function addUnlockDigit(digit) {
+    setUnlockPasscode((prev) => `${prev}${digit}`.replace(/\D/g, "").slice(0, 4));
+  }
+
+  function eraseUnlockDigit() {
+    setUnlockPasscode((prev) => prev.slice(0, -1));
   }
 
   async function handleGuestContinue() {
@@ -380,14 +392,55 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                 <div className="mt-2 flex flex-col gap-3">
                   {guestHasPasscode ? (
                     <>
-                      <label>Guest passcode</label>
-                      <input
-                        type="password"
-                        value={unlockPasscode}
-                        onChange={(e) => setUnlockPasscode(e.target.value)}
-                        placeholder="Enter your passcode"
-                        autoFocus
-                      />
+                      <div className="guest-lock">
+                        <div className="guest-lock-title">Enter passcode</div>
+                        <div className="guest-pin-dots" aria-label={`${unlockPasscode.length} of 4 digits entered`}>
+                          {[0, 1, 2, 3].map((index) => (
+                            <span
+                              key={index}
+                              className={`guest-pin-dot ${unlockPasscode.length > index ? "is-filled" : ""}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="guest-keypad" aria-label="Guest passcode keypad">
+                          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
+                            <button
+                              key={digit}
+                              type="button"
+                              className="guest-key"
+                              onClick={() => addUnlockDigit(digit)}
+                              disabled={loading || unlockPasscode.length >= 4}
+                            >
+                              {digit}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className="guest-key guest-key--muted"
+                            onClick={() => setUnlockPasscode("")}
+                            disabled={loading || !unlockPasscode}
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            className="guest-key"
+                            onClick={() => addUnlockDigit("0")}
+                            disabled={loading || unlockPasscode.length >= 4}
+                          >
+                            0
+                          </button>
+                          <button
+                            type="button"
+                            className="guest-key guest-key--muted"
+                            onClick={eraseUnlockDigit}
+                            disabled={loading || !unlockPasscode}
+                            aria-label="Delete last digit"
+                          >
+                            Del
+                          </button>
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={handleGuestUnlock}
@@ -409,16 +462,20 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                       <label>Create passcode</label>
                       <input
                         type="password"
+                        inputMode="numeric"
+                        maxLength={4}
                         value={guestPasscode}
-                        onChange={(e) => setGuestPasscode(e.target.value)}
-                        placeholder="At least 4 characters"
+                        onChange={(e) => setDigits(setGuestPasscode, e.target.value)}
+                        placeholder="4 digits"
                       />
                       <label>Confirm passcode</label>
                       <input
                         type="password"
+                        inputMode="numeric"
+                        maxLength={4}
                         value={guestPasscodeConfirm}
-                        onChange={(e) => setGuestPasscodeConfirm(e.target.value)}
-                        placeholder="Repeat passcode"
+                        onChange={(e) => setDigits(setGuestPasscodeConfirm, e.target.value)}
+                        placeholder="Repeat 4 digits"
                       />
                       <button
                         type="button"
@@ -566,16 +623,20 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                   <label>Create passcode</label>
                   <input
                     type="password"
+                    inputMode="numeric"
+                    maxLength={4}
                     value={guestPasscode}
-                    onChange={(e) => setGuestPasscode(e.target.value)}
-                    placeholder="At least 4 characters"
+                    onChange={(e) => setDigits(setGuestPasscode, e.target.value)}
+                    placeholder="4 digits"
                   />
                   <label>Confirm passcode</label>
                   <input
                     type="password"
+                    inputMode="numeric"
+                    maxLength={4}
                     value={guestPasscodeConfirm}
-                    onChange={(e) => setGuestPasscodeConfirm(e.target.value)}
-                    placeholder="Repeat passcode"
+                    onChange={(e) => setDigits(setGuestPasscodeConfirm, e.target.value)}
+                    placeholder="Repeat 4 digits"
                   />
                   <button
                     type="button"

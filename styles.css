@@ -1066,6 +1066,68 @@ button.new-entry-btn {
   min-height: 42px;
 }
 
+.guest-lock {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 12px 0 4px;
+}
+
+.guest-lock-title {
+  font-size: 14px;
+  font-weight: 780;
+  color: var(--color-text);
+}
+
+.guest-pin-dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 18px;
+}
+
+.guest-pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(116, 94, 246, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.guest-pin-dot.is-filled {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.guest-keypad {
+  width: min(100%, 260px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.guest-key {
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(116, 94, 246, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 760;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(85, 62, 180, 0.10);
+}
+
+.guest-key--muted {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.guest-key:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .local-name-banner {
     grid-template-columns: 1fr;
