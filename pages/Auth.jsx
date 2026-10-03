@@ -1,6 +1,12 @@
 // pages/Auth.jsx
 import React, { useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
+import {
+  getLocalPasscodeName,
+  hasLocalPasscode,
+  setLocalPasscode,
+  verifyLocalPasscode,
+} from "../lib/localJournalStore.js";
 import { useNavigate } from "react-router-dom";
 
 function capFirst(str) {
@@ -27,6 +33,11 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   const [resetEmail, setResetEmail] = useState("");
   const [showGuestName, setShowGuestName] = useState(false);
   const [guestName, setGuestName] = useState("");
+  const [guestPasscode, setGuestPasscode] = useState("");
+  const [guestPasscodeConfirm, setGuestPasscodeConfirm] = useState("");
+  const [unlockPasscode, setUnlockPasscode] = useState("");
+  const [guestHasPasscode, setGuestHasPasscode] = useState(() => hasLocalPasscode());
+  const [guestStoredName, setGuestStoredName] = useState(() => getLocalPasscodeName());
 
   // Sign-up
   const [firstName, setFirstName] = useState("");
@@ -55,7 +66,14 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   );
 
   const resetReady = useMemo(() => resetEmail.trim().length > 0, [resetEmail]);
-  const guestReady = useMemo(() => guestName.trim().length > 0, [guestName]);
+  const guestReady = useMemo(
+    () =>
+      guestName.trim().length > 0 &&
+      guestPasscode.trim().length >= 4 &&
+      guestPasscode === guestPasscodeConfirm,
+    [guestName, guestPasscode, guestPasscodeConfirm]
+  );
+  const unlockReady = useMemo(() => unlockPasscode.trim().length > 0, [unlockPasscode]);
 
   // Buttons / styles
   const activeBtn = "bg-[var(--color-primary)] text-white border-transparent";
@@ -83,6 +101,9 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     setPanel("signin");
     setShowReset(false);
     setShowGuestName(false);
+    setGuestPasscode("");
+    setGuestPasscodeConfirm("");
+    setUnlockPasscode("");
     setMsg("");
     setShowVerifyNotice(false); // ✅ reset notice unless we just signed up
     // keep sign-in fields as-is
@@ -92,6 +113,9 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     setPanel("signup");
     setShowReset(false); // requirement: sign in + reset expanded by default, signup collapses sign-in
     setShowGuestName(false);
+    setGuestPasscode("");
+    setGuestPasscodeConfirm("");
+    setUnlockPasscode("");
     setMsg("");
     setShowVerifyNotice(false);
     setSignupEmail(email); // helpful carry-over
@@ -101,12 +125,45 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     setGuestName(defaultName);
     setShowGuestName(true);
     setShowReset(false);
+    setGuestPasscode("");
+    setGuestPasscodeConfirm("");
+    setUnlockPasscode("");
     setMsg("");
   }
 
-  function handleGuestContinue() {
+  async function handleGuestContinue() {
     if (!guestReady) return;
-    onUseLocalMode?.(capFirst(guestName));
+    setLoading(true);
+    setMsg("");
+    try {
+      const cleanName = capFirst(guestName);
+      await setLocalPasscode(cleanName, guestPasscode);
+      setGuestHasPasscode(true);
+      setGuestStoredName(cleanName);
+      onUseLocalMode?.(cleanName);
+    } catch (err) {
+      setMsg(err?.message || "Could not save passcode.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGuestUnlock() {
+    if (!unlockReady) return;
+    setLoading(true);
+    setMsg("");
+    try {
+      const ok = await verifyLocalPasscode(unlockPasscode);
+      if (!ok) {
+        setMsg("That passcode did not match this browser's local journal.");
+        return;
+      }
+      onUseLocalMode?.(guestStoredName || "Guest");
+    } catch (err) {
+      setMsg(err?.message || "Could not unlock local journal.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSignIn(e) {
@@ -307,28 +364,72 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
               <button
                 type="button"
                 className={`${toggleBtnBase} ${inactiveBtn}`}
-                onClick={() => openGuestName()}
+                onClick={() => {
+                  if (guestHasPasscode) {
+                    setShowGuestName(true);
+                    setMsg("");
+                  } else {
+                    openGuestName();
+                  }
+                }}
               >
                 Continue as guest
               </button>
 
               {showGuestName && panel === "signin" && (
                 <div className="mt-2 flex flex-col gap-3">
-                  <label>Name for demo</label>
-                  <input
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="Your name"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={handleGuestContinue}
-                    disabled={!guestReady}
-                    className={`${toggleBtnBase} ${guestReady ? activeBtn : inactiveBtn}`}
-                  >
-                    Start guest demo
-                  </button>
+                  {guestHasPasscode ? (
+                    <>
+                      <label>Guest passcode</label>
+                      <input
+                        type="password"
+                        value={unlockPasscode}
+                        onChange={(e) => setUnlockPasscode(e.target.value)}
+                        placeholder="Enter your passcode"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGuestUnlock}
+                        disabled={loading || !unlockReady}
+                        className={`${toggleBtnBase} ${unlockReady ? activeBtn : inactiveBtn}`}
+                      >
+                        {loading ? "Unlocking..." : "Unlock guest journal"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <label>Name for demo</label>
+                      <input
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        placeholder="Your name"
+                        autoFocus
+                      />
+                      <label>Create passcode</label>
+                      <input
+                        type="password"
+                        value={guestPasscode}
+                        onChange={(e) => setGuestPasscode(e.target.value)}
+                        placeholder="At least 4 characters"
+                      />
+                      <label>Confirm passcode</label>
+                      <input
+                        type="password"
+                        value={guestPasscodeConfirm}
+                        onChange={(e) => setGuestPasscodeConfirm(e.target.value)}
+                        placeholder="Repeat passcode"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGuestContinue}
+                        disabled={loading || !guestReady}
+                        className={`${toggleBtnBase} ${guestReady ? activeBtn : inactiveBtn}`}
+                      >
+                        {loading ? "Starting..." : "Start guest demo"}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -462,13 +563,27 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                     placeholder="Your name"
                     autoFocus
                   />
+                  <label>Create passcode</label>
+                  <input
+                    type="password"
+                    value={guestPasscode}
+                    onChange={(e) => setGuestPasscode(e.target.value)}
+                    placeholder="At least 4 characters"
+                  />
+                  <label>Confirm passcode</label>
+                  <input
+                    type="password"
+                    value={guestPasscodeConfirm}
+                    onChange={(e) => setGuestPasscodeConfirm(e.target.value)}
+                    placeholder="Repeat passcode"
+                  />
                   <button
                     type="button"
                     onClick={handleGuestContinue}
-                    disabled={!guestReady}
+                    disabled={loading || !guestReady}
                     className={`${toggleBtnBase} ${guestReady ? activeBtn : inactiveBtn}`}
                   >
-                    Start guest demo
+                    {loading ? "Starting..." : "Start guest demo"}
                   </button>
                 </div>
               )}
