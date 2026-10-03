@@ -143,7 +143,7 @@ export default function App() {
       if (!isSupabaseConfigured || !supabase) {
         if (!mounted) return;
         setStorageMode("local");
-        setSession(startLocalSession());
+        setSession(null);
         setBootLoading(false);
         return;
       }

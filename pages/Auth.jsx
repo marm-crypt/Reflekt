@@ -25,6 +25,8 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   // Forgot password (lives under sign-in card)
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [showGuestName, setShowGuestName] = useState(false);
+  const [guestName, setGuestName] = useState("");
 
   // Sign-up
   const [firstName, setFirstName] = useState("");
@@ -53,6 +55,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   );
 
   const resetReady = useMemo(() => resetEmail.trim().length > 0, [resetEmail]);
+  const guestReady = useMemo(() => guestName.trim().length > 0, [guestName]);
 
   // Buttons / styles
   const activeBtn = "bg-[var(--color-primary)] text-white border-transparent";
@@ -79,6 +82,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   function openSignIn() {
     setPanel("signin");
     setShowReset(false);
+    setShowGuestName(false);
     setMsg("");
     setShowVerifyNotice(false); // ✅ reset notice unless we just signed up
     // keep sign-in fields as-is
@@ -87,9 +91,22 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   function openSignUp() {
     setPanel("signup");
     setShowReset(false); // requirement: sign in + reset expanded by default, signup collapses sign-in
+    setShowGuestName(false);
     setMsg("");
     setShowVerifyNotice(false);
     setSignupEmail(email); // helpful carry-over
+  }
+
+  function openGuestName(defaultName = "") {
+    setGuestName(defaultName);
+    setShowGuestName(true);
+    setShowReset(false);
+    setMsg("");
+  }
+
+  function handleGuestContinue() {
+    if (!guestReady) return;
+    onUseLocalMode?.(capFirst(guestName));
   }
 
   async function handleSignIn(e) {
@@ -97,7 +114,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     if (!signInReady) return;
 
     if (!supabaseEnabled || !supabase) {
-      onUseLocalMode?.("Local");
+      openGuestName();
       return;
     }
 
@@ -148,7 +165,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
     if (!signUpReady) return;
 
     if (!supabaseEnabled || !supabase) {
-      onUseLocalMode?.(capFirst(firstName) || "Local");
+      openGuestName(capFirst(firstName));
       return;
     }
 
@@ -242,7 +259,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                 className="mt-4 rounded-xl border border-[var(--color-border)] bg-white/30 p-3 text-sm"
                 style={{ lineHeight: 1.35 }}
               >
-                Supabase is not configured for this build. Local mode saves entries in this browser.
+                This portfolio demo saves guest entries in this browser.
               </div>
             )}
 
@@ -290,10 +307,30 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
               <button
                 type="button"
                 className={`${toggleBtnBase} ${inactiveBtn}`}
-                onClick={() => onUseLocalMode?.("Local")}
+                onClick={() => openGuestName()}
               >
-                Continue locally
+                Continue as guest
               </button>
+
+              {showGuestName && panel === "signin" && (
+                <div className="mt-2 flex flex-col gap-3">
+                  <label>Name for demo</label>
+                  <input
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Your name"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGuestContinue}
+                    disabled={!guestReady}
+                    className={`${toggleBtnBase} ${guestReady ? activeBtn : inactiveBtn}`}
+                  >
+                    Start guest demo
+                  </button>
+                </div>
+              )}
 
               {/* Forgot password link (underlined, no border) */}
               <button
@@ -361,7 +398,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
                 className="mt-4 rounded-xl border border-[var(--color-border)] bg-white/30 p-3 text-sm"
                 style={{ lineHeight: 1.35 }}
               >
-                Account creation needs Supabase. Local mode is available on this device.
+                Account creation needs Supabase. You can use the guest demo on this device.
               </div>
             )}
 
@@ -411,10 +448,30 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
               <button
                 type="button"
                 className={`${toggleBtnBase} ${inactiveBtn}`}
-                onClick={() => onUseLocalMode?.(capFirst(firstName) || "Local")}
+                onClick={() => openGuestName(capFirst(firstName))}
               >
-                Continue locally
+                Continue as guest
               </button>
+
+              {showGuestName && panel === "signup" && (
+                <div className="mt-2 flex flex-col gap-3">
+                  <label>Name for demo</label>
+                  <input
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Your name"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGuestContinue}
+                    disabled={!guestReady}
+                    className={`${toggleBtnBase} ${guestReady ? activeBtn : inactiveBtn}`}
+                  >
+                    Start guest demo
+                  </button>
+                </div>
+              )}
 
               {/* Same type of button as others */}
               <button
