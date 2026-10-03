@@ -1,9 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: "/journal-test/",
+  base: mode === "demo" ? "/" : "/journal-test/",
   server: {
     proxy: {
       "/api/ollama": {
@@ -16,4 +16,4 @@ export default defineConfig({
   build: {
     outDir: "docs",
   },
-});
+}));

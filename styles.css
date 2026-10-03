@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 94, 94, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(244, 94, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 94, 94, 0);
+  }
+}
+
+.recording-pulse {
+  animation: pulse-ring 2s infinite;
+}
+
+
 /* =========================================================
    Reflekt — Cohesive Light Theme CSS (CLEANED + FIXED)
    Changes made (everything else kept the same):

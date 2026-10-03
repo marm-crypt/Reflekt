@@ -9,7 +9,7 @@ function capFirst(str) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function Auth() {
+export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
   const navigate = useNavigate();
 
   // Which card is open? ("signin" or "signup")
@@ -96,6 +96,11 @@ export default function Auth() {
     e.preventDefault();
     if (!signInReady) return;
 
+    if (!supabaseEnabled || !supabase) {
+      onUseLocalMode?.("Local");
+      return;
+    }
+
     setLoading(true);
     setMsg("");
 
@@ -130,7 +135,9 @@ export default function Auth() {
 
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setMsg(err?.message || "Something went wrong.");
+      setMsg(
+        `${err?.message || "Something went wrong."} You can continue locally while Supabase is unavailable.`
+      );
     } finally {
       setLoading(false);
     }
@@ -139,6 +146,11 @@ export default function Auth() {
   async function handleSignUp(e) {
     e.preventDefault();
     if (!signUpReady) return;
+
+    if (!supabaseEnabled || !supabase) {
+      onUseLocalMode?.(capFirst(firstName) || "Local");
+      return;
+    }
 
     setLoading(true);
     setMsg("");
@@ -179,7 +191,9 @@ export default function Auth() {
       setPanel("signin");
       setShowReset(false);
     } catch (err) {
-      setMsg(err?.message || "Something went wrong.");
+      setMsg(
+        `${err?.message || "Something went wrong."} You can continue locally while Supabase is unavailable.`
+      );
     } finally {
       setLoading(false);
     }
@@ -188,6 +202,11 @@ export default function Auth() {
   async function handleResetPassword(e) {
     e.preventDefault();
     if (!resetReady) return;
+
+    if (!supabaseEnabled || !supabase) {
+      setMsg("Password reset needs Supabase. You can continue locally for now.");
+      return;
+    }
 
     setLoading(true);
     setMsg("");
@@ -217,6 +236,15 @@ export default function Auth() {
             <p className="text-sm opacity-80 mt-1">
               Sign in to access your journal.
             </p>
+
+            {!supabaseEnabled && (
+              <div
+                className="mt-4 rounded-xl border border-[var(--color-border)] bg-white/30 p-3 text-sm"
+                style={{ lineHeight: 1.35 }}
+              >
+                Supabase is not configured for this build. Local mode saves entries in this browser.
+              </div>
+            )}
 
             {/* ✅ Verify notice shown after first-time sign-up (doesn't affect flow) */}
             {showVerifyNotice && (
@@ -257,6 +285,14 @@ export default function Auth() {
                 }`}
               >
                 {loading ? "Signing in…" : "Sign in"}
+              </button>
+
+              <button
+                type="button"
+                className={`${toggleBtnBase} ${inactiveBtn}`}
+                onClick={() => onUseLocalMode?.("Local")}
+              >
+                Continue locally
               </button>
 
               {/* Forgot password link (underlined, no border) */}
@@ -320,6 +356,15 @@ export default function Auth() {
               Make an account to start saving entries.
             </p>
 
+            {!supabaseEnabled && (
+              <div
+                className="mt-4 rounded-xl border border-[var(--color-border)] bg-white/30 p-3 text-sm"
+                style={{ lineHeight: 1.35 }}
+              >
+                Account creation needs Supabase. Local mode is available on this device.
+              </div>
+            )}
+
             {/* ✅ Small reminder (doesn't block sign-up) */}
             <div className="mt-4 text-sm opacity-80">
               First time here? After you sign up, you may need to verify your email before signing in.
@@ -361,6 +406,14 @@ export default function Auth() {
                 }`}
               >
                 {loading ? "Creating…" : "Create account"}
+              </button>
+
+              <button
+                type="button"
+                className={`${toggleBtnBase} ${inactiveBtn}`}
+                onClick={() => onUseLocalMode?.(capFirst(firstName) || "Local")}
+              >
+                Continue locally
               </button>
 
               {/* Same type of button as others */}

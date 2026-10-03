@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import EntryCard from "../components/EntryCard";
 import { ArrowsRightLeftIcon, MoonIcon, PlusIcon, SunIcon } from "@heroicons/react/24/outline";
 import {
+  analyzeMood, // Import the new function
   buildPromptContext,
   generateTitleSuggestionsLocal,
   generateTitleSuggestionsWithOllama,
@@ -543,7 +544,7 @@ export default function Home({
             setMsg("");
           }
         })
-        .catch(() => {});
+        .catch(() => { });
       setMsg("Generating fresh prompts...");
       return;
     }
@@ -664,11 +665,20 @@ export default function Home({
         : "";
       const cleanTitle = rawTitle || autoTitle || "untitled";
 
-      // Mood handled by onAddEntry (App/Supabase layer). Keep themes empty.
+      const moodRes = analyzeMood(cleanContent);
+      // Mood handled by onAddEntry (App/Supabase layer) but we pass explicit checks if we want
+      // Actually APP_SPECS says mood handled by onAddEntry... wait, checking Home.jsx original code.
+      // Original code: mood: moodFromText(cleanContent) (which returned string)
+      // We should pass the object now if the backend supports it, or just the string if not.
+      // App.jsx likely just writes what we give it to Supabase.
+      // Let's pass the same structure as EntryCard to be safe/consistent.
+
       await onAddEntry({
         title: cleanTitle,
         content: cleanContent,
-        mood: moodFromText(cleanContent),
+        mood: moodRes.mood,
+        mood_confidence: moodRes.confidence,
+        mood_tokens: moodRes.tokens,
         themes: [],
       });
 
@@ -803,7 +813,7 @@ export default function Home({
                   Entry
                 </label>
                 <button
-                  className={`record-btn ${isRecording ? "is-recording" : ""}`}
+                  className={`record-btn ${isRecording ? "recording-pulse" : ""}`}
                   type="button"
                   onClick={toggleRecording}
                   style={{
@@ -820,16 +830,14 @@ export default function Home({
                     fontSize: "12px",
                     fontWeight: isRecording ? 700 : 600,
                     color: isRecording ? "#f45e5e" : "inherit",
-                    boxShadow: isRecording ? "0 0 0 3px rgba(244, 94, 94, 0.15)" : "none",
+                    transition: "all 0.2s ease"
                   }}
                   title="Click to record voice entry"
                 >
                   <span className="record-mic-wrap">
                     <IconMic />
-                    {isRecording ? <span className="record-live-dot" aria-hidden="true" /> : null}
                   </span>
-                  {isRecording ? <span className="record-live-label">REC</span> : null}
-                  {isRecording ? "Stop" : "Record"}
+                  {isRecording ? "Stop Recording" : "Record Voice"}
                 </button>
               </div>
               <textarea
@@ -893,9 +901,9 @@ export default function Home({
                 <div className="small-muted" style={{ marginTop: -4 }}>
                   {draftSavedAt
                     ? `Draft autosaved at ${new Date(draftSavedAt).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}`
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}`
                     : "Saving draft..."}
                 </div>
               )}
