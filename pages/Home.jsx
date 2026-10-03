@@ -177,11 +177,12 @@ export default function Home({
 
     return "";
   }, [session]);
-  const needsLocalName = storageMode === "local" && (!firstName || firstName === "Local");
+  const needsLocalName =
+    storageMode === "local" && (!firstName || firstName === "Local" || firstName === "Guest");
 
   useEffect(() => {
     if (!needsLocalName || localNameDraft) return;
-    setLocalNameDraft(firstName === "Local" ? "" : firstName);
+    setLocalNameDraft(firstName === "Local" || firstName === "Guest" ? "" : firstName);
   }, [firstName, localNameDraft, needsLocalName]);
 
   function saveLocalDisplayName(e) {
