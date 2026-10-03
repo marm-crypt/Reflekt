@@ -150,7 +150,7 @@ export default function Auth({ supabaseEnabled = true, onUseLocalMode }) {
         }
       }
 
-      navigate("/dashboard", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setMsg(
         `${err?.message || "Something went wrong."} You can continue locally while Supabase is unavailable.`

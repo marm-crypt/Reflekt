@@ -115,7 +115,7 @@ export default function App() {
     setStorageMode("local");
     setSession(localSession);
     setEntries(listLocalEntries());
-    navigate("/dashboard", { replace: true });
+    navigate("/", { replace: true });
   }
 
   function handleUpdateLocalName(name) {
@@ -529,7 +529,7 @@ export default function App() {
               path="/auth"
               element={
                 session ? (
-                  <Navigate to="/dashboard" replace />
+                  <Navigate to="/" replace />
                 ) : (
                   <Auth
                     supabaseEnabled={isSupabaseConfigured}
