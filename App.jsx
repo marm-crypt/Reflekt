@@ -19,7 +19,16 @@ import {
 import Home from "./pages/Home.jsx";
 import Auth from "./pages/Auth.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import { supabase } from "./lib/supabaseClient.js";
+import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
+import {
+  createLocalEntry,
+  deleteLocalEntry,
+  endLocalSession,
+  getLocalSession,
+  listLocalEntries,
+  startLocalSession,
+  updateLocalEntry,
+} from "./lib/localJournalStore.js";
 
 function ProtectedRoute({ session, children }) {
   if (!session) return <Navigate to="/auth" replace />;
@@ -28,6 +37,7 @@ function ProtectedRoute({ session, children }) {
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [storageMode, setStorageMode] = useState("supabase");
   const [bootLoading, setBootLoading] = useState(true);
 
   const [entries, setEntries] = useState([]);
@@ -88,10 +98,23 @@ export default function App() {
 
   async function handleLogout() {
     try {
-      await supabase.auth.signOut();
+      if (storageMode === "local") {
+        endLocalSession();
+      } else {
+        await supabase?.auth.signOut();
+      }
     } finally {
+      setSession(null);
       navigate("/auth", { replace: true });
     }
+  }
+
+  function enterLocalMode(name) {
+    const localSession = startLocalSession(name);
+    setStorageMode("local");
+    setSession(localSession);
+    setEntries(listLocalEntries());
+    navigate("/dashboard", { replace: true });
   }
 
   /* ---------------------------
@@ -101,6 +124,23 @@ export default function App() {
     let mounted = true;
 
     async function boot() {
+      const localSession = getLocalSession();
+      if (localSession) {
+        if (!mounted) return;
+        setStorageMode("local");
+        setSession(localSession);
+        setBootLoading(false);
+        return;
+      }
+
+      if (!isSupabaseConfigured || !supabase) {
+        if (!mounted) return;
+        setStorageMode("local");
+        setSession(startLocalSession());
+        setBootLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.getSession();
       if (!mounted) return;
       if (error) console.warn("getSession error:", error);
@@ -110,9 +150,10 @@ export default function App() {
 
     boot();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase?.auth.onAuthStateChange((_event, newSession) => {
+      setStorageMode("supabase");
       setSession(newSession);
-    });
+    }) || {};
 
     return () => {
       mounted = false;
@@ -131,6 +172,11 @@ export default function App() {
 
     setEntriesLoading(true);
     try {
+      if (storageMode === "local") {
+        setEntries(listLocalEntries());
+        return;
+      }
+
       const { data, error } = await supabase
         .from("journal_entries")
         .select("*")
@@ -216,6 +262,12 @@ export default function App() {
       updated_at: now,
     };
 
+    if (storageMode === "local") {
+      const inserted = createLocalEntry(payload);
+      setEntries((prev) => [inserted, ...prev]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("journal_entries")
       .insert(payload)
@@ -244,6 +296,14 @@ export default function App() {
     if (patch.themes !== undefined) updatePayload.themes = patch.themes;
     if (patch.created_at !== undefined) updatePayload.created_at = patch.created_at;
 
+    if (storageMode === "local") {
+      const updated = updateLocalEntry(id, updatePayload);
+      if (updated) {
+        setEntries((prev) => prev.map((e) => (e.id === id ? updated : e)));
+      }
+      return;
+    }
+
     const { data, error } = await supabase
       .from("journal_entries")
       .update(updatePayload)
@@ -265,6 +325,12 @@ export default function App() {
   async function deleteEntry(id) {
     const userId = session?.user?.id;
     if (!userId) throw new Error("Not signed in.");
+
+    if (storageMode === "local") {
+      deleteLocalEntry(id);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
 
     const { error } = await supabase
       .from("journal_entries")
@@ -452,7 +518,16 @@ export default function App() {
 
             <Route
               path="/auth"
-              element={session ? <Navigate to="/dashboard" replace /> : <Auth />}
+              element={
+                session ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Auth
+                    supabaseEnabled={isSupabaseConfigured}
+                    onUseLocalMode={enterLocalMode}
+                  />
+                )
+              }
             />
 
             <Route

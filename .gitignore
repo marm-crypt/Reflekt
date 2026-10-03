@@ -1,6 +1,11 @@
 # dependencies
 node_modules/
 
+# local env files
+.env
+.env.local
+.env.*.local
+
 # build / cache
 node_modules/.cache/
 dist/
@@ -9,3 +14,6 @@ docs/.vite/
 # mac junk
 .DS_Store
 __MACOSX/
+
+# stale exported filename with a trailing space
+README.md\ 

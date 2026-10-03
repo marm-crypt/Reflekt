@@ -1,6 +1,6 @@
 // components/EntryCard.jsx
 import React, { useState } from "react";
-import Sentiment from "sentiment";
+import { analyzeMood } from "../lib/aiPromptEngine";
 
 /* ---------------------------
    Helpers
@@ -57,36 +57,6 @@ function mergeDateWithBaseTime(dateValue, baseIso) {
    Great / Good / Okay / Bad / Awful
    (Used only when editing + saving)
 ---------------------------- */
-function moodFromText(text) {
-  // Use the `sentiment` package to get a numeric sentiment score,
-  // then map that score into the five buckets: Great / Good / Okay / Bad / Awful.
-  try {
-    const analyzer = new Sentiment();
-    const res = analyzer.analyze(text || "");
-    const score = typeof res.score === "number" ? res.score : 0;
-    // derive a simple confidence metric from the magnitude of the score
-    // normalize: confidence = clamp(|score| / 6, 0, 1)
-    const confidence = Math.min(1, Math.abs(score) / 6);
-    // pick top contributing terms (positive and negative) to show as a hint
-    const tokens = (res.words || []).slice(0, 6);
-
-    // Mapping thresholds (tuneable):
-    // 5+  => Great
-    // 2-4 => Good
-    // -1-1 => Okay
-    // -4..-2 => Bad
-    // -5 or lower => Awful
-    if (score >= 5) return { mood: "Great", score, confidence, tokens };
-    if (score >= 2) return { mood: "Good", score, confidence, tokens };
-    if (score >= -1) return { mood: "Okay", score, confidence, tokens };
-    if (score >= -4) return { mood: "Bad", score, confidence, tokens };
-    return { mood: "Awful", score, confidence, tokens };
-  } catch (e) {
-    // Fallback to Okay on unexpected errors
-    return { mood: "Okay", score: 0, confidence: 0, tokens: [] };
-  }
-}
-
 function moodClass(mood) {
   if (mood === "Great") return "tag-mood-great";
   if (mood === "Good") return "tag-mood-good";
@@ -233,7 +203,7 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
     try {
       const content = c.trim();
       const title = (t || "").trim() || "untitled";
-      const moodRes = moodFromText(content);
+      const moodRes = analyzeMood(content);
       const mood = moodRes?.mood || "Okay";
 
       // Save mood as string, and include confidence/tokens for later display
@@ -317,17 +287,20 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
   const rawMood = entry?.mood;
   let moodStr = "Okay";
   let confidence = entry?.mood_confidence;
+  let moodTokens = entry?.mood_tokens || [];
 
   if (rawMood != null) {
     if (typeof rawMood === "object") {
       moodStr = rawMood.mood || moodStr;
       if (rawMood.confidence != null) confidence = rawMood.confidence;
+      if (Array.isArray(rawMood.tokens)) moodTokens = rawMood.tokens;
     } else if (typeof rawMood === "string") {
       try {
         const parsed = JSON.parse(rawMood);
         if (parsed && typeof parsed === "object") {
           moodStr = parsed.mood || rawMood;
           if (parsed.confidence != null) confidence = parsed.confidence;
+          if (Array.isArray(parsed.tokens)) moodTokens = parsed.tokens;
         } else {
           moodStr = rawMood;
         }
@@ -339,12 +312,11 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
 
   // Fallback for older entries that don't have mood persisted yet.
   if (rawMood == null || (typeof moodStr === "string" && !moodStr.trim())) {
-    moodStr = moodFromText(entry?.content || "").mood;
+    const computed = analyzeMood(entry?.content || "");
+    moodStr = computed.mood;
+    if (confidence == null) confidence = computed.confidence ?? 0;
+    if (!moodTokens.length) moodTokens = computed.tokens ?? [];
   }
-
-  // derive confidence from stored values or recompute from content
-  const computed = moodFromText(entry?.content || "");
-  if (confidence == null) confidence = computed.confidence ?? 0;
 
   function saveCorrection(newMood) {
     if (typeof onUpdate !== "function") return;
@@ -357,7 +329,7 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
         const map = raw ? JSON.parse(raw) : {};
         map[entry.id] = { mood: newMood, when: Date.now() };
         localStorage.setItem(key, JSON.stringify(map));
-      } catch (_) {}
+      } catch (_) { }
 
       // send update to parent (stores on backend)
       onUpdate(entry.id, { mood: newMood, mood_confidence: 1, mood_tokens: [] });
@@ -378,33 +350,44 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
             <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 6, opacity: 0.65 }}>
               {countWords(entry?.content)} words
             </div>
-                  <div className="tags">
-                    {!overrideOpen ? (
-                      <span
-                        className={`tag ${moodClass(moodStr)}`}
-                        onClick={() => setOverrideOpen(true)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <IconMood mood={moodStr} />
-                        Mood: {moodStr}
-                      </span>
-                    ) : (
-                      <div className="mood-override" onMouseLeave={() => setOverrideOpen(false)}>
-                        {["Great", "Good", "Okay", "Bad", "Awful"].map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            className={`tag ${moodClass(m)}`}
-                            onClick={() => saveCorrection(m)}
-                            style={{ marginRight: 8 }}
-                          >
-                            <IconMood mood={m} />
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            <div className="tags" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
+              {!overrideOpen ? (
+                <span
+                  className={`tag ${moodClass(moodStr)}`}
+                  onClick={() => setOverrideOpen(true)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <IconMood mood={moodStr} />
+                  Mood: {moodStr}
+                </span>
+              ) : (
+                <div className="mood-override" onMouseLeave={() => setOverrideOpen(false)}>
+                  {["Great", "Good", "Okay", "Bad", "Awful"].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`tag ${moodClass(m)}`}
+                      onClick={() => saveCorrection(m)}
+                      style={{ marginRight: 8 }}
+                    >
+                      <IconMood mood={m} />
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Show extracted keywords if available */}
+              {!overrideOpen && moodTokens && moodTokens.length > 0 && (
+                <div style={{ display: "flex", gap: "4px", fontSize: "11px", opacity: 0.7 }}>
+                  {moodTokens.map((tok, i) => (
+                    <span key={i} style={{ background: "rgba(0,0,0,0.04)", padding: "2px 6px", borderRadius: "12px" }}>
+                      {tok}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <div className="edit-form">
@@ -425,10 +408,11 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
                 max={toDateInputValue(new Date().toISOString())}
               />
             </div>
-            
+
             <button
               type="button"
               onClick={toggleRecording}
+              className={isRecording ? "recording-pulse" : ""}
               style={{
                 marginTop: "8px",
                 padding: "10px 12px",
@@ -442,11 +426,12 @@ export default function EntryCard({ entry, onUpdate, onDelete }) {
                 fontSize: "12px",
                 fontWeight: 500,
                 color: isRecording ? "#f45e5e" : "inherit",
+                transition: "all 0.2s ease"
               }}
               title="Click to record voice entry"
             >
               <IconMic />
-              {isRecording ? "Stop Recording" : "Record Voice"}
+              {isRecording ? "Listening... (Click to Stop)" : "Record Voice"}
             </button>
 
             <div className="edit-actions">
